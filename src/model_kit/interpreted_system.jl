@@ -7,7 +7,7 @@ mutable struct TaylorInterpreters{T}
     order_4::Union{Nothing,Interpreter{Vector{TruncatedTaylorSeries{5,T}}}}
 end
 TaylorInterpreters{T}() where {T} =
-    TaylorInterpreters{ComplexF64}(nothing, nothing, nothing, nothing)
+    TaylorInterpreters{T}(nothing, nothing, nothing, nothing)
 
 """
     InterpretedSystem <: AbstractSystem
@@ -22,30 +22,41 @@ Construct an `InterpretedSystem` from the given [`System`](@ref) `F`.
 """
 mutable struct InterpretedSystem <: AbstractSystem
     system::System
+
     eval_ComplexF64::Interpreter{Vector{ComplexF64}}
+    jac_ComplexF64::Interpreter{Vector{ComplexF64}}
+    taylor_ComplexF64::TaylorInterpreters{ComplexF64}
+
     eval_ComplexDF64::Interpreter{Vector{ComplexDF64}}
+    jac_ComplexDF64::Interpreter{Vector{ComplexDF64}}
+    taylor_ComplexDF64::TaylorInterpreters{ComplexDF64}
+
     # Construct acb lazily since its often not needed
     eval_acb::Union{Nothing,Interpreter{AcbRefVector}}
-    taylor_ComplexF64::TaylorInterpreters{ComplexF64}
-    jac_ComplexF64::Interpreter{Vector{ComplexF64}}
     jac_acb::Union{Nothing,Interpreter{AcbRefVector}}
 end
 
 function InterpretedSystem(F::System)
     eval_ComplexF64 = interpreter(ComplexF64, F)
-    eval_ComplexDF64 = interpreter(ComplexDF64, eval_ComplexF64)
-    eval_acb = nothing
-    taylor_ComplexF64 = TaylorInterpreters{ComplexF64}()
     jac_ComplexF64 = jacobian_interpreter(ComplexF64, F)
+    taylor_ComplexF64 = TaylorInterpreters{ComplexF64}()
+
+    eval_ComplexDF64 = interpreter(ComplexDF64, eval_ComplexF64)
+    jac_ComplexDF64 = interpreter(ComplexDF64, jac_ComplexF64)
+    taylor_ComplexDF64 = TaylorInterpreters{ComplexDF64}()
+
+    eval_acb = nothing
     jac_acb = nothing
 
     InterpretedSystem(
         F,
         eval_ComplexF64,
-        eval_ComplexDF64,
-        eval_acb,
-        taylor_ComplexF64,
         jac_ComplexF64,
+        taylor_ComplexF64,
+        eval_ComplexDF64,
+        jac_ComplexDF64,
+        taylor_ComplexDF64,
+        eval_acb,
         jac_acb,
     )
 end
@@ -79,6 +90,51 @@ function jacobian!(U, F::InterpretedSystem, x, p = nothing)
     U
 end
 
+function evaluate_and_jacobian!(
+    u,
+    U,
+    F::InterpretedSystem,
+    x::AbstractVector{ComplexDF64},
+    p = nothing,
+)
+    execute!(u, U, F.jac_ComplexDF64, x, p)
+    nothing
+end
+function jacobian!(U, F::InterpretedSystem, x::AbstractVector{ComplexDF64}, p = nothing)
+    execute!(nothing, U, F.jac_ComplexDF64, x, p;)
+    U
+end
+
+
+function gen_taylor_code(M, T)
+    taylor_field = Symbol(:taylor_, T)
+    order_field = Symbol(:order_, M)
+    quote
+        I = F.$(taylor_field).$(order_field)
+        if isnothing(I)
+            I′ = interpreter(TruncatedTaylorSeries{$(M + 1),$T}, F.$(Symbol(:eval_, T)))
+            F.$(taylor_field).$(order_field) = I′
+            execute_taylor!(
+                u,
+                Order,
+                I′,
+                x,
+                p;
+                assign_highest_order_only = assign_highest_order_only,
+            )
+        else
+            execute_taylor!(
+                u,
+                Order,
+                I,
+                x,
+                p;
+                assign_highest_order_only = assign_highest_order_only,
+            )
+        end
+        u
+    end
+end
 @generated function taylor!(
     u::AbstractVector,
     Order::Val{M},
@@ -87,112 +143,7 @@ end
     p = nothing;
     assign_highest_order_only::Bool = u isa Vector,
 ) where {M}
-    if M == 1
-        quote
-            I = F.taylor_ComplexF64.order_1
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{2,ComplexF64}, F.eval_ComplexF64)
-                F.taylor_ComplexF64.order_1 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    elseif M == 2
-        quote
-            I = F.taylor_ComplexF64.order_2
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{3,ComplexF64}, F.eval_ComplexF64)
-                F.taylor_ComplexF64.order_2 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    elseif M == 3
-        quote
-            I = F.taylor_ComplexF64.order_3
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{4,ComplexF64}, F.eval_ComplexF64)
-                F.taylor_ComplexF64.order_3 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    elseif M == 4
-        quote
-            I = F.taylor_ComplexF64.order_4
-            if isnothing(I)
-                I′ = interpreter(TruncatedTaylorSeries{5,ComplexF64}, F.eval_ComplexF64)
-                F.taylor_ComplexF64.order_4 = I′
-                execute_taylor!(
-                    u,
-                    Order,
-                    I′,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            else
-                execute_taylor!(
-                    u,
-                    Order,
-                    I,
-                    x,
-                    p;
-                    assign_highest_order_only = assign_highest_order_only,
-                )
-            end
-            u
-        end
-    end
-
+    gen_taylor_code(M, :ComplexF64)
 end
 
 # Acb
