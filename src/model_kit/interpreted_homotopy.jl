@@ -20,7 +20,7 @@ mutable struct InterpretedHomotopy <: AbstractHomotopy
 
     eval_ComplexDF64::Interpreter{Vector{ComplexDF64}}
     jac_ComplexDF64::Interpreter{Vector{ComplexDF64}}
-    taylor_ComplexF64::TaylorInterpreters{ComplexDF64}
+    taylor_ComplexDF64::TaylorInterpreters{ComplexDF64}
 
     # Construct acb lazily since its often not needed
     eval_acb::Union{Nothing,Interpreter{AcbRefVector}}
