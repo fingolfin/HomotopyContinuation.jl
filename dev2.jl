@@ -5,6 +5,85 @@ import Arblib: Acb, Arb, AcbMatrix, AcbVector
 using LinearAlgebra
 include("test/test_systems.jl")
 
+using BenchmarkTools
+include("src/adaptive_tracker.jl")
+
+F = four_bar()
+
+q = read_parameters("four_bar_params_start.txt");
+p = read_parameters("four_bar_params_target.txt");
+xs = read_solutions("four_bar_sols.txt");
+
+H = ParameterHomotopy(F, q, p; compile = false);
+x₀ = xs[1]
+
+S = AllTrackerState2(H);
+adaptive_track(H, x₀, S, 5000)
+
+@benchmark adaptive_track($H, $x₀, $S, 5000)
+t = 1.0
+
+
+@benchmark track($(Tracker(H)), $x₀)
+
+
+u = zeros(ComplexF64, size(H, 1))
+tracker_state = AdaptiveTrackerState{ComplexF64}(H)
+predictor = PredictorState(H)
+
+x = copy(x₀)
+# predicted
+x̂ = similar(x)
+# corrected
+x̄ = similar(x)
+
+# Check if really zero
+evaluate!(u, H, xs[1], 1.0)
+if norm(u) > 1e-12
+    @warn ("Norm of given value: ", norm(u))
+end
+
+t = 1.0
+successes = 0
+Δt = -1e-2
+
+iter = 0
+max_iters = 1000
+while abs(Δt) > 16 * eps()
+    iter += 1
+
+    evaluate_and_jacobian!(u, tracker_state.prec_ComplexF64.M.A, H, x, t)
+    HomotopyContinuation.updated!(tracker_state.prec_ComplexF64.M)
+
+    x̂ = predict(H, x, t, Δt, predictor.cache_ComplexF64, tracker_state.prec_ComplexF64)
+    t̂ = t + Δt
+
+    (x̄, code) = correct(H, x̂, t̂)
+    if code == :success
+        x = x̄
+        t = t̂
+        successes += 1
+        if (successes >= 3)
+            Δt *= 2
+            successes = 0
+        end
+        Δt = -min(t, abs(Δt))
+    else
+        successes = 0
+        Δt *= 0.5
+    end
+
+    (iter > max_iters) && break
+end
+
+
+return x, t, iter
+
+
+
+
+
+
 Arblib.Acb(x::ComplexDF64; prec = 256) = Acb(
     Arb(real(x).hi, prec = prec) + Arb(real(x).lo, prec = prec),
     Arb(imag(x).hi, prec = prec) + Arb(imag(x).lo, prec = prec),
@@ -28,6 +107,10 @@ t_target = 0.0
 u = zeros(ComplexDF64, size(H, 1))
 
 evaluate!(u, H, xs[1], 1.0)
+
+Base.@kwdef struct PredictorPrecisionState
+    cache_ComplexF64::PredictorCache{ComplexF64}
+end
 
 Base.@kwdef mutable struct PredictorCache{T}
     tx⁰::TaylorVector{1,T}
