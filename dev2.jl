@@ -6,25 +6,69 @@ using LinearAlgebra
 include("test/test_systems.jl")
 
 using BenchmarkTools
-include("src/adaptive_tracker.jl")
+include("src/new_tracker/adaptive_tracker.jl")
 
 F = four_bar()
 
 q = read_parameters("four_bar_params_start.txt");
 p = read_parameters("four_bar_params_target.txt");
 xs = read_solutions("four_bar_sols.txt");
+bad_paths = [
+    135,
+    779,
+    845,
+    861,
+    1250,
+    1450,
+    1950,
+    1979,
+    2138,
+    2365,
+    2698,
+    3050,
+    3194,
+    3566,
+    3589,
+    3709,
+    3970,
+    4643,
+    4828,
+    4997,
+    5275,
+    5567,
+    5619,
+    6139,
+    6535,
+    6910,
+    7100,
+    7480,
+    7937,
+    8196,
+]
 
 H = ParameterHomotopy(F, q, p; compile = false);
-x₀ = xs[1]
+x₀ = xs[1];
+tracker = AdaptivePathTracker(H; predictor_order = 3);
+@time S = adaptive_track(tracker, xs[1:200]);
 
-S = AllTrackerState2(H);
-adaptive_track(H, x₀, S, 5000)
+findall(s -> s.code !== :success, S)
+
+
+@time r = adaptive_track(tracker, xs[1])
+@benchmark adaptive_track($tracker, $(xs[1:100]))
+
+
 
 @benchmark adaptive_track($H, $x₀, $S, 5000)
 t = 1.0
 
 
-@benchmark track($(Tracker(H)), $x₀)
+T = Tracker(H)
+@time rs = map(x -> track(T, x), xs);
+count(r -> is_success(r), rs)
+
+@benchmark map(x -> track($T, x), $(xs[1:100]))
+@benchmark track($(Tracker(H)), $(xs[1]))
 
 
 u = zeros(ComplexF64, size(H, 1))
