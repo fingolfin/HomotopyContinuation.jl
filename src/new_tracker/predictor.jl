@@ -49,15 +49,17 @@ Predictor(H; order = 4) =
 function predict!(
     x̂,
     H,
-    x::Vector{T},
+    x::AbstractVector,
     t,
     Δt,
     config::PredictorConfig,
-    pred_state::PredictorPrecState{T},
-    tracker_state::AdaptiveTrackerPrecisionState{T},
-) where {T}
+    pred_state::PredictorPrecState,
+    tracker_state::AdaptiveTrackerPrecisionState,
+)
     @unpack tx⁰, tx¹, tx², tx³, tx⁴, u = pred_state
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
+
+    norm = WeightedNorm(InfNorm(), x⁰)
 
 
     # Assume that we have an up to date + factorized Jacobian
@@ -66,6 +68,27 @@ function predict!(
     taylor!(u, Val(1), H, x, t)
     u .= .-u
     LA.ldiv!(pred_state.x, tracker_state.M, u)
+    δ1 = HomotopyContinuation.fixed_precision_iterative_refinement!(
+        pred_state.x,
+        tracker_state.M,
+        u,
+        norm,
+    )
+    @show δ1
+    δ2 = HomotopyContinuation.fixed_precision_iterative_refinement!(
+        pred_state.x,
+        tracker_state.M,
+        u,
+        norm,
+    )
+    @show δ2
+    # δ₂ = HomotopyContinuation.mixed_precision_iterative_refinement!(
+    #     pred_state.x,
+    #     tracker_state.M,
+    #     u,
+    #     norm,
+    # )
+    # @show δ₂
     x¹ .= pred_state.x
 
     if (config.order == 1)

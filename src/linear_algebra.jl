@@ -413,6 +413,7 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
         WS.r .= b
         qr_ldiv!(x, WS.qr, WS.r)
     end
+
     x
 end
 

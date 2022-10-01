@@ -7,9 +7,16 @@ struct AdaptiveTrackerPrecisionState{T,M}
     M::MatrixWorkspace{T,M}
 end
 
-mutable struct AdaptiveTrackerState{M1,M2}
+Base.@kwdef mutable struct AdaptiveTrackerState{M1,M2}
     prec_ComplexF64::AdaptiveTrackerPrecisionState{ComplexF64,M1}
     prec_ComplexDF64::AdaptiveTrackerPrecisionState{ComplexDF64,M2}
+
+    t::Float64 = 1.0
+    Δt::Float64 = -1e-2
+    successes::Int = 0
+    iter::Int = 0
+    last_step_failed::Bool = true
+    code::Symbol = :tracking
     # internal step size
     # segment_stepper::SegmentStepper
     # Δs_prev::Float64 # previous step size
@@ -30,7 +37,7 @@ end
 
 function AdaptiveTrackerState(H::AbstractHomotopy)
     AdaptiveTrackerState(
-        AdaptiveTrackerPrecisionState{ComplexF64}(H),
-        AdaptiveTrackerPrecisionState{ComplexDF64}(H),
+        prec_ComplexF64 = AdaptiveTrackerPrecisionState{ComplexF64}(H),
+        prec_ComplexDF64 = AdaptiveTrackerPrecisionState{ComplexDF64}(H),
     )
 end
