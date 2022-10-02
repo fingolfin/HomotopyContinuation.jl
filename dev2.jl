@@ -144,8 +144,12 @@ H = ParameterHomotopy(F, q, p; compile = false);
 
 x₀ = xs[1];
 tracker = AdaptivePathTracker(H; predictor_order = 4);
-@time S = adaptive_track(tracker, s_q);
+# @time S = adaptive_track(tracker, s_q);
 @time tracker_path_info(tracker, s_q)
+
+
+T = Tracker(H)
+HomotopyContinuation.path_info(T, s_q)
 
 findall(s -> s.code !== :success, S)
 
@@ -159,7 +163,7 @@ findall(s -> s.code !== :success, S)
 t = 1.0
 
 
-T = Tracker(H)
+
 @time rs = map(x -> track(T, x), xs);
 count(r -> is_success(r), rs)
 
@@ -214,6 +218,7 @@ while abs(Δt) > 16 * eps()
     end
 
     (iter > max_iters) && break
+
 end
 
 

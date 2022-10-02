@@ -60,6 +60,7 @@ function predict!(
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
     norm = WeightedNorm(InfNorm(), x⁰)
+    HomotopyContinuation.init!(norm, x⁰)
 
 
     # Assume that we have an up to date + factorized Jacobian
@@ -68,27 +69,12 @@ function predict!(
     taylor!(u, Val(1), H, x, t)
     u .= .-u
     LA.ldiv!(pred_state.x, tracker_state.M, u)
-    δ1 = HomotopyContinuation.fixed_precision_iterative_refinement!(
+    HomotopyContinuation.fixed_precision_iterative_refinement!(
         pred_state.x,
         tracker_state.M,
         u,
         norm,
     )
-    @show δ1
-    δ2 = HomotopyContinuation.fixed_precision_iterative_refinement!(
-        pred_state.x,
-        tracker_state.M,
-        u,
-        norm,
-    )
-    @show δ2
-    # δ₂ = HomotopyContinuation.mixed_precision_iterative_refinement!(
-    #     pred_state.x,
-    #     tracker_state.M,
-    #     u,
-    #     norm,
-    # )
-    # @show δ₂
     x¹ .= pred_state.x
 
     if (config.order == 1)
@@ -99,6 +85,12 @@ function predict!(
     taylor!(u, Val(2), H, tx¹, t)
     u .= .-u
     LA.ldiv!(pred_state.x, tracker_state.M, u)
+    HomotopyContinuation.fixed_precision_iterative_refinement!(
+        pred_state.x,
+        tracker_state.M,
+        u,
+        norm,
+    )
     x² .= pred_state.x
 
     if (config.order == 2)
@@ -112,6 +104,12 @@ function predict!(
     taylor!(u, Val(3), H, tx², t)
     u .= .-u
     LA.ldiv!(pred_state.x, tracker_state.M, u)
+    HomotopyContinuation.fixed_precision_iterative_refinement!(
+        pred_state.x,
+        tracker_state.M,
+        u,
+        norm,
+    )
     x³ .= pred_state.x
 
     if (config.order == 3)

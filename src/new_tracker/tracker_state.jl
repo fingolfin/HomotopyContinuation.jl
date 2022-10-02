@@ -17,6 +17,9 @@ Base.@kwdef mutable struct AdaptiveTrackerState{M1,M2}
     iter::Int = 0
     last_step_failed::Bool = true
     code::Symbol = :tracking
+    η::Float64
+    ω::Float64
+    norm_Δx₀::Float64 = 0.0
     # internal step size
     # segment_stepper::SegmentStepper
     # Δs_prev::Float64 # previous step size
@@ -39,5 +42,7 @@ function AdaptiveTrackerState(H::AbstractHomotopy)
     AdaptiveTrackerState(
         prec_ComplexF64 = AdaptiveTrackerPrecisionState{ComplexF64}(H),
         prec_ComplexDF64 = AdaptiveTrackerPrecisionState{ComplexDF64}(H),
+        η = 1.0,
+        ω = 1.0,
     )
 end

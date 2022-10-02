@@ -53,14 +53,14 @@ function tracker_path_info(tracker::AdaptivePathTracker, x₀; debug::Bool = fal
         # e = local_error(tracker.predictor)
         # push!(Δx_t, e * abs(state.Δt)^p)
         # push!(τ, tracker.options.parameters.β_τ * trust_region(tracker.predictor))
-        # push!(ω, state.ω)
+        push!(ω, state.ω)
         # push!(accuracy, state.accuracy)
         # push!(μ, state.μ)
         # push!(high_prec, state.extended_prec)
         step!(tracker)
 
         push!(accepted_rejected, !state.last_step_failed)
-        # push!(Δx₀, state.norm_Δx₀)
+        push!(Δx₀, state.norm_Δx₀)
         push!(norm_x, maximum(abs, state.prec_ComplexF64.x))
         # push!(Δx̂x, state.norm(state.x .- state.x̂))
     end
@@ -90,21 +90,25 @@ function path_table(io::IO, info::TrackerPathInfo)
         "",
         "s",
         "Δs",
-        #  "ω", "|Δx₀|", "h₀", "acc", "μ", "τ", "Δx_t", "Δpred ",
+        "ω",
+        "err",
+        "|Δx₀|",
+        #"h₀", "acc", "μ", "τ", "Δx_t", "Δpred ",
         "|x|",
     ]
     h1 = PrettyTables.Highlighter(
         f = (data, i, j) -> j == 1 && data[i, 1] == :✗,
         crayon = PrettyTables.crayon"red",
     )
+
     h2 = PrettyTables.Highlighter(
         f = (data, i, j) -> j == 1 && data[i, 1] == :✓,
         crayon = PrettyTables.crayon"green",
     )
-    # h3 = PrettyTables.Highlighter(
-    #     f = (data, i, j) -> j == 3 && data[i, 3] ≈ -data[i, 9],
-    #     crayon = PrettyTables.crayon"blue",
-    # )
+    h3 = PrettyTables.Highlighter(
+        f = (data, i, j) -> j == 6 && 10data[i, 5] < data[i, 6],
+        crayon = PrettyTables.crayon"blue",
+    )
     h4 = PrettyTables.Highlighter(
         f = (data, i, j) -> j == 8 && info.high_prec[i],
         crayon = PrettyTables.crayon"blue",
@@ -115,8 +119,11 @@ function path_table(io::IO, info::TrackerPathInfo)
         ✓✗,
         info.s,
         info.Δs,
-        # info.ω,
-        # info.Δx₀,
+        info.ω,
+        # map(wi -> (1e-16)^(1 / 8) / (wi)^(7 / 8), info.ω),
+        map(wi -> 3 / (8wi), info.ω),
+        # [0; map(wi -> 3 / (8wi), info.ω[1:end-1])],
+        info.Δx₀,
         # info.ω .* info.Δx₀,
         # info.accuracy,
         # info.μ,
@@ -136,7 +143,7 @@ function path_table(io::IO, info::TrackerPathInfo)
         header = header,
         crop = :none,
         # formatters = (ft1, ft2, ft4),
-        highlighters = (h1, h2, h4),
+        highlighters = (h1, h2, h3, h4),
     )
 end
 
@@ -156,5 +163,14 @@ function Base.show(io::IO, info::TrackerPathInfo)
     # println(io, " • # factorizations → ", info.n_factorizations)
     # println(io, " • # ldivs → ", info.n_ldivs)
     path_table(io, info)
-    print(io, "Total: ", length(info.s))
+    println(
+        io,
+        " • # steps (✓/✗) → ",
+        length(info.s),
+        " ( ",
+        count(info.accepted_rejected),
+        " / ",
+        count(!, info.accepted_rejected),
+        " )",
+    )
 end

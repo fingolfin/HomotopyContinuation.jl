@@ -49,8 +49,7 @@ function path_info(tracker::Tracker, x₀, t₁ = 1.0, t₀ = 0.0; debug::Bool =
     while is_tracking(tracker.state.code)
         push!(s, real(state.t))
         push!(Δs, real(state.Δt))
-        e = local_error(tracker.predictor)
-        push!(Δx_t, e * abs(state.Δt)^p)
+        push!(Δx_t, Float64(local_error(tracker.predictor)))
         push!(τ, tracker.options.parameters.β_τ * trust_region(tracker.predictor))
         push!(ω, state.ω)
         push!(accuracy, state.accuracy)
@@ -85,7 +84,7 @@ end
 
 path_table(info::PathInfo) = path_table(stdout, info)
 function path_table(io::IO, info::PathInfo)
-    header = ["", "s", "Δs", "ω", "|Δx₀|", "h₀", "acc", "μ", "τ", "Δx_t", "Δpred ", "|x|"]
+    header = ["", "s", "Δs", "ω", "|Δx₀|", "h₀", "acc", "μ", "τ", "e", "Δpred ", "|x|"]
     h1 = PrettyTables.Highlighter(
         f = (data, i, j) -> j == 1 && data[i, 1] == :✗,
         crayon = PrettyTables.crayon"red",

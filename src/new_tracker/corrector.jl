@@ -28,7 +28,10 @@ function correct!(
     @unpack u, Δx̄, x̄ = corrector_state
     x̄ .= x̂
     norm = WeightedNorm(InfNorm(), x̄)
-    for iter = 1:3
+    HomotopyContinuation.init!(norm, x̄)
+    norm_Δx₀ = 0.0
+    ω = NaN
+    for iter = 0:3
         evaluate_and_jacobian!(u, tracker_state.M, H, x̄, t)
         HomotopyContinuation.updated!(tracker_state.M)
         LA.ldiv!(Δx̄, tracker_state.M, u)
@@ -45,13 +48,16 @@ function correct!(
         #     u,
         #     norm,
         # )
-        # @show δ
+        @show norm(x̄)
+        (iter == 0) && (norm_Δx₀ = norm(Δx̄))
+        (iter == 1) && (ω = 2 * norm(Δx̄) / norm_Δx₀^2)
         x̄ .= x̄ .- Δx̄
+
         if norm(Δx̄) < 1e-12 * norm(x̄)
             x̄_out .= x̄
-            return (x̄_out, :success)
+            return (x̄_out, :success, ω, norm_Δx₀)
         end
     end
     x̄_out .= x̄
-    return (x̄_out, :failure)
+    return (x̄_out, :failure, ω, norm_Δx₀)
 end

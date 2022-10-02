@@ -83,7 +83,7 @@ function step!(tracker::AdaptivePathTracker)
         t̂ = 0.0
     end
 
-    (x̄, code) = correct!(
+    (x̄, code, ω, norm_Δx₀) = correct!(
         x̄,
         homotopy,
         x̂,
@@ -91,17 +91,42 @@ function step!(tracker::AdaptivePathTracker)
         corrector_state.cache_ComplexDF64,
         state.prec_ComplexDF64,
     )
+    state.norm_Δx₀ = norm_Δx₀
+    norm = WeightedNorm(InfNorm(), x̄)
+    HomotopyContinuation.init!(norm, x̄)
+
     if code == :success
         x .= x̄
         state.t = t̂
         state.successes += 1
-        if (state.successes >= 3)
-            state.Δt *= 2
-            state.successes = 0
-        end
+        state.ω = max(ω, 1)
+        state.η = norm(x̂ - x̄) / abs(state.Δt)^(predictor.config.order)
+        ω̂ = state.ω
+        η̂ = state.η
+        δ1 = (eps())^(1 / 8) / ω̂^(7 / 8)
+        δ2 = 1 / (8ω̂)
+        # δ3 = begin
+        #     a = (eps())^(1 / 7)
+        #     h_a = 2a * (√(4 * a^2 + 1) - 2a)
+        #     (√(1 + 2h_a) - 1) / ω̂
+        # end
+        # if (δ3 < δ1)
+        #     @show δ1, δ2, δ3
+        # end
+        Δt₁ = (min(δ1, δ2) / η̂)^(1 / predictor.config.order)
+        err = (1e-16)^(1 / 8) / (2ω)^(7 / 8)
+        # Δt₂ = 
+        state.Δt = min(Δt₁)
+        # if (state.successes >= 3)
+        #     state.Δt *= 2
+        #     state.successes = 0
+        # end
         state.Δt = -min(state.t, abs(state.Δt))
         state.last_step_failed = false
     else
+        if (!isnan(ω))
+            state.ω = ω
+        end
         state.last_step_failed = true
         state.successes = 0
         state.Δt *= 0.5
