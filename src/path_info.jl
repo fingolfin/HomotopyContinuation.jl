@@ -134,6 +134,7 @@ end
 
 function Base.show(io::IO, info::PathInfo)
     println(io, "PathInfo:")
+    path_table(io, info)
     println(io, " • # return code → ", info.return_code)
     println(
         io,
@@ -147,5 +148,4 @@ function Base.show(io::IO, info::PathInfo)
     )
     println(io, " • # factorizations → ", info.n_factorizations)
     println(io, " • # ldivs → ", info.n_ldivs)
-    path_table(io, info)
 end

@@ -19,7 +19,9 @@ Base.@kwdef mutable struct AdaptiveTrackerState{M1,M2}
     code::Symbol = :tracking
     η::Float64
     ω::Float64
+    τ::Float64 = 0.0
     norm_Δx₀::Float64 = 0.0
+    norm::WeightedNorm{InfNorm}
     # internal step size
     # segment_stepper::SegmentStepper
     # Δs_prev::Float64 # previous step size
@@ -44,5 +46,6 @@ function AdaptiveTrackerState(H::AbstractHomotopy)
         prec_ComplexDF64 = AdaptiveTrackerPrecisionState{ComplexDF64}(H),
         η = 1.0,
         ω = 1.0,
+        norm = WeightedNorm(ones(size(H, 2)), InfNorm()),
     )
 end

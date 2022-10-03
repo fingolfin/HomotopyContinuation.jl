@@ -145,6 +145,16 @@ end
 ) where {M}
     gen_taylor_code(M, :ComplexF64)
 end
+@generated function taylor!(
+    u::AbstractVector,
+    Order::Val{M},
+    F::InterpretedSystem,
+    x::AbstractVector{ComplexDF64},
+    p = nothing;
+    assign_highest_order_only::Bool = u isa Vector,
+) where {M}
+    gen_taylor_code(M, :ComplexDF64)
+end
 
 # Acb
 function evaluate!(

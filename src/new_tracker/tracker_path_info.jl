@@ -52,7 +52,7 @@ function tracker_path_info(tracker::AdaptivePathTracker, x₀; debug::Bool = fal
         push!(Δs, real(state.Δt))
         # e = local_error(tracker.predictor)
         # push!(Δx_t, e * abs(state.Δt)^p)
-        # push!(τ, tracker.options.parameters.β_τ * trust_region(tracker.predictor))
+        push!(τ, state.τ)
         push!(ω, state.ω)
         # push!(accuracy, state.accuracy)
         # push!(μ, state.μ)
@@ -94,6 +94,7 @@ function path_table(io::IO, info::TrackerPathInfo)
         "err",
         "|Δx₀|",
         #"h₀", "acc", "μ", "τ", "Δx_t", "Δpred ",
+        "τ",
         "|x|",
     ]
     h1 = PrettyTables.Highlighter(
@@ -109,10 +110,10 @@ function path_table(io::IO, info::TrackerPathInfo)
         f = (data, i, j) -> j == 6 && 10data[i, 5] < data[i, 6],
         crayon = PrettyTables.crayon"blue",
     )
-    h4 = PrettyTables.Highlighter(
-        f = (data, i, j) -> j == 8 && info.high_prec[i],
-        crayon = PrettyTables.crayon"blue",
-    )
+    # h4 = PrettyTables.Highlighter(
+    #     f = (data, i, j) -> j == 8 && info.high_prec[i],
+    #     crayon = PrettyTables.crayon"blue",
+    # )
 
     ✓✗ = map(v -> v ? :✓ : :✗, info.accepted_rejected)
     data = hcat(
@@ -127,7 +128,7 @@ function path_table(io::IO, info::TrackerPathInfo)
         # info.ω .* info.Δx₀,
         # info.accuracy,
         # info.μ,
-        # info.τ,
+        info.τ,
         # info.Δx_t,
         # info.Δx̂x,
         info.norm_x,
@@ -143,7 +144,7 @@ function path_table(io::IO, info::TrackerPathInfo)
         header = header,
         crop = :none,
         # formatters = (ft1, ft2, ft4),
-        highlighters = (h1, h2, h3, h4),
+        highlighters = (h1, h2, h3),
     )
 end
 

@@ -53,44 +53,43 @@ function predict!(
     t,
     Δt,
     config::PredictorConfig,
+    norm,
     pred_state::PredictorPrecState,
     tracker_state::AdaptiveTrackerPrecisionState,
 )
     @unpack tx⁰, tx¹, tx², tx³, tx⁴, u = pred_state
     x⁰, x¹, x², x³, x⁴ = vectors(tx⁴)
 
-    norm = WeightedNorm(InfNorm(), x⁰)
-    HomotopyContinuation.init!(norm, x⁰)
 
+    ldiv_and_refine =
+        () -> begin
+            LA.ldiv!(pred_state.x, tracker_state.M, u)
 
+            HomotopyContinuation.fixed_precision_iterative_refinement!(
+                pred_state.x,
+                tracker_state.M,
+                u,
+                norm,
+            )
+
+        end
     # Assume that we have an up to date + factorized Jacobian
     x⁰ .= x
 
-    taylor!(u, Val(1), H, x, t)
+    taylor!(u, Val(1), H, ComplexDF64.(x), t)
     u .= .-u
-    LA.ldiv!(pred_state.x, tracker_state.M, u)
-    HomotopyContinuation.fixed_precision_iterative_refinement!(
-        pred_state.x,
-        tracker_state.M,
-        u,
-        norm,
-    )
+    ldiv_and_refine()
     x¹ .= pred_state.x
 
     if (config.order == 1)
         x̂ .= x .+ Δt .* x¹
-        return x̂
+        τ = norm(x¹)
+        return τ
     end
 
     taylor!(u, Val(2), H, tx¹, t)
     u .= .-u
-    LA.ldiv!(pred_state.x, tracker_state.M, u)
-    HomotopyContinuation.fixed_precision_iterative_refinement!(
-        pred_state.x,
-        tracker_state.M,
-        u,
-        norm,
-    )
+    ldiv_and_refine()
     x² .= pred_state.x
 
     if (config.order == 2)
@@ -98,18 +97,13 @@ function predict!(
             δᵢ = 1 - Δt * xᵢ² / xᵢ¹
             x̂[i] = xᵢ + Δt * xᵢ¹ / δᵢ
         end
-        return x̂
+        τ = norm(x¹) / norm(x²)
+        return τ
     end
 
     taylor!(u, Val(3), H, tx², t)
     u .= .-u
-    LA.ldiv!(pred_state.x, tracker_state.M, u)
-    HomotopyContinuation.fixed_precision_iterative_refinement!(
-        pred_state.x,
-        tracker_state.M,
-        u,
-        norm,
-    )
+    ldiv_and_refine()
     x³ .= pred_state.x
 
     if (config.order == 3)
@@ -117,12 +111,13 @@ function predict!(
             δᵢ = 1 - Δt * xᵢ³ / xᵢ²
             x̂[i] = xᵢ + Δt * (xᵢ¹ + Δt * xᵢ² / δᵢ)
         end
-        return x̂
+        τ = norm(x²) / norm(x³)
+        return τ
     end
 
     taylor!(u, Val(4), H, tx³, t)
     u .= .-u
-    LA.ldiv!(pred_state.x, tracker_state.M, u)
+    ldiv_and_refine()
     x⁴ .= pred_state.x
 
     for (i, (xᵢ, xᵢ¹, xᵢ², xᵢ³, xᵢ⁴)) in enumerate(tx⁴)
@@ -130,5 +125,6 @@ function predict!(
         x̂[i] = xᵢ + Δt * (xᵢ¹ + Δt * (xᵢ² + Δt * xᵢ³ / δᵢ))
     end
 
-    x̂
+    τ = norm(x³) / norm(x⁴)
+    return τ
 end

@@ -22,25 +22,24 @@ function correct!(
     H,
     x̂::AbstractVector,
     t,
+    norm,
     corrector_state::CorrectorPrecState{T},
     tracker_state::AdaptiveTrackerPrecisionState{T},
 ) where {T}
     @unpack u, Δx̄, x̄ = corrector_state
     x̄ .= x̂
-    norm = WeightedNorm(InfNorm(), x̄)
-    HomotopyContinuation.init!(norm, x̄)
+    norm_Δxᵢ = 0.0
     norm_Δx₀ = 0.0
     ω = NaN
-    for iter = 0:3
+    ε = 1e-12
+    for iter = 0:2
         evaluate_and_jacobian!(u, tracker_state.M, H, x̄, t)
+        # evaluate!(u, H, ComplexDF64.(x̄), t)
         HomotopyContinuation.updated!(tracker_state.M)
         LA.ldiv!(Δx̄, tracker_state.M, u)
-        # δ = HomotopyContinuation.mixed_precision_iterative_refinement!(
-        #     Δx̄,
-        #     tracker_state.M,
-        #     u,
-        #     norm,
-        # )
+        # HomotopyContinuation.fixed_precision_iterative_refinement!(Δx̄, tracker_state.M, u)
+        # HomotopyContinuation.mixed_precision_iterative_refinement!(Δx̄, tracker_state.M, u)
+        norm_Δxᵢ = norm(Δx̄)
         # @show δ
         # δ = HomotopyContinuation.mixed_precision_iterative_refinement!(
         #     Δx̄,
@@ -48,16 +47,18 @@ function correct!(
         #     u,
         #     norm,
         # )
-        @show norm(x̄)
-        (iter == 0) && (norm_Δx₀ = norm(Δx̄))
+        (iter == 0) && (norm_Δx₀ = norm_Δxᵢ)
         (iter == 1) && (ω = 2 * norm(Δx̄) / norm_Δx₀^2)
         x̄ .= x̄ .- Δx̄
 
-        if norm(Δx̄) < 1e-12 * norm(x̄)
+
+        if iter >= 1 && ω * norm_Δxᵢ^2 ≤ ε
             x̄_out .= x̄
             return (x̄_out, :success, ω, norm_Δx₀)
         end
+
     end
+
     x̄_out .= x̄
     return (x̄_out, :failure, ω, norm_Δx₀)
 end

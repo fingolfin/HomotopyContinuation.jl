@@ -43,6 +43,7 @@ function init!(tracker::AdaptivePathTracker, x₀::AbstractVector)
     state.iter = 0
     state.last_step_failed = true
     state.code = :tracking
+    HomotopyContinuation.init!(state.norm, x)
 end
 
 function step!(tracker::AdaptivePathTracker)
@@ -68,13 +69,14 @@ function step!(tracker::AdaptivePathTracker)
     HomotopyContinuation.updated!(state.prec_ComplexF64.M)
     # end
 
-    predict!(
+    τ = predict!(
         x̂,
         homotopy,
         x,
         state.t,
         state.Δt,
         predictor.config,
+        state.norm,
         predictor.state.cache_ComplexF64,
         state.prec_ComplexF64,
     )
@@ -88,6 +90,7 @@ function step!(tracker::AdaptivePathTracker)
         homotopy,
         x̂,
         t̂,
+        state.norm,
         corrector_state.cache_ComplexDF64,
         state.prec_ComplexDF64,
     )
@@ -100,29 +103,19 @@ function step!(tracker::AdaptivePathTracker)
         state.t = t̂
         state.successes += 1
         state.ω = max(ω, 1)
+        state.τ = τ
         state.η = norm(x̂ - x̄) / abs(state.Δt)^(predictor.config.order)
         ω̂ = state.ω
         η̂ = state.η
-        δ1 = (eps())^(1 / 8) / ω̂^(7 / 8)
+        δ1 = (1e-12)^(1 / 8) / ω̂^(7 / 8)
         δ2 = 1 / (8ω̂)
-        # δ3 = begin
-        #     a = (eps())^(1 / 7)
-        #     h_a = 2a * (√(4 * a^2 + 1) - 2a)
-        #     (√(1 + 2h_a) - 1) / ω̂
-        # end
-        # if (δ3 < δ1)
-        #     @show δ1, δ2, δ3
-        # end
+
         Δt₁ = (min(δ1, δ2) / η̂)^(1 / predictor.config.order)
-        err = (1e-16)^(1 / 8) / (2ω)^(7 / 8)
-        # Δt₂ = 
-        state.Δt = min(Δt₁)
-        # if (state.successes >= 3)
-        #     state.Δt *= 2
-        #     state.successes = 0
-        # end
-        state.Δt = -min(state.t, abs(state.Δt))
+        Δt₂ = τ
+        new_Δt = 0.8min(Δt₁, Δt₂)
+        state.Δt = -min(state.t, new_Δt)
         state.last_step_failed = false
+        update!(state.norm, x̂)
     else
         if (!isnan(ω))
             state.ω = ω
