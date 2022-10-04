@@ -866,20 +866,27 @@ function iterative_refinement!(
     norm::AbstractNorm;
     max_iters::Int = 3,
     tol::Float64 = sqrt(eps()),
+    mixed_precision::Bool = true
 )
     J.ldivs[] += 1
-    δ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
+    δ = fixed_precision_iterative_refinement!(x, workspace(J), b, norm)
+    while
+    if δ < tol
+        return δ
+    end
     for i = 2:max_iters
         J.ldivs[] += 1
-        δ′ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
-        if δ′ < tol
-            return (accuracy = δ′, diverged = false)
-        elseif δ′ > 0.5 * δ
-            return (accuracy = δ′, diverged = true)
+        if mixed_precision
+            δ′ = mixed_precision_iterative_refinement!(x, workspace(J), b, norm)
+        else
+            δ′ = fixed_precision_iterative_refinement!(x, workspace(J), b, norm)
+        end
+        if δ′ < tol || δ < 2δ′
+            return δ′
         end
         δ = δ′
     end
-    (accuracy = δ, diverged = false)
+    return δ
 end
 
 

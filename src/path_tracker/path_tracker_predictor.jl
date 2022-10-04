@@ -19,8 +19,7 @@ Otherwise numerical differentiation is used.
 """
 Base.@kwdef mutable struct Predictor
     method::PredictionMethod.methods = PredictionMethod.Pade31
-    order::Int = 4
-    use_hermite::Bool = true
+    order::Int = 5
     trust_region::Float64 = Inf
     local_error::Float64 = Inf
     cond_H_ẋ::Float64 = Inf
@@ -29,54 +28,51 @@ Base.@kwdef mutable struct Predictor
     tx¹::TaylorVector{2,ComplexF64}
     tx²::TaylorVector{3,ComplexF64}
     tx³::TaylorVector{4,ComplexF64}
+    tx⁴::TaylorVector{5,ComplexF64}
     t::ComplexF64 = complex(NaN)
-    tx_norm::Vector{Float64} = zeros(4)
+    tx_norm::Vector{Float64} = zeros(5)
 
     # finite diff
     xtemp::Vector{ComplexF64}
     u::Vector{ComplexF64}
-    u₁::Vector{ComplexF64}
-    u₂::Vector{ComplexF64}
 
-    # for interpolation
-    prev_tx¹::TaylorVector{2,ComplexF64}
-    prev_t::ComplexF64 = complex(NaN)
-
-    # endgame predictor
-    winding_number::Int = 1
-    s::ComplexF64 = complex(NaN)
-    prev_s::ComplexF64 = complex(NaN)
-    ty¹::TaylorVector{2,ComplexF64}
-    prev_ty¹::TaylorVector{2,ComplexF64}
+    # # endgame predictor
+    # winding_number::Int = 1
+    # s::ComplexF64 = complex(NaN)
+    # prev_s::ComplexF64 = complex(NaN)
+    # ty¹::TaylorVector{2,ComplexF64}
+    # prev_ty¹::TaylorVector{2,ComplexF64}
 end
 
 
 function Predictor(H::AbstractHomotopy)
     m, n = size(H)
-    tx³ = TaylorVector{4}(ComplexF64, n)
+    tx⁴ = TaylorVector{5}(ComplexF64, n)
     Predictor(
-        tx⁰ = TaylorVector{1}(tx³),
-        tx¹ = TaylorVector{2}(tx³),
-        tx² = TaylorVector{3}(tx³),
-        tx³ = tx³,
+        tx⁰ = TaylorVector{1}(tx⁴),
+        tx¹ = TaylorVector{2}(tx⁴),
+        tx² = TaylorVector{3}(tx⁴),
+        tx³ = TaylorVector{3}(tx⁴),
+        tx⁴ = tx⁴,
         xtemp = zeros(ComplexF64, n),
         u = zeros(ComplexF64, m),
-        u₁ = zeros(ComplexF64, m),
-        u₂ = zeros(ComplexF64, m),
+        # u₁ = zeros(ComplexF64, m),
+        # u₂ = zeros(ComplexF64, m),
         prev_tx¹ = TaylorVector{2}(ComplexF64, n),
-        ty¹ = TaylorVector{2}(ComplexF64, n),
-        prev_ty¹ = TaylorVector{2}(ComplexF64, n),
+        # ty¹ = TaylorVector{2}(ComplexF64, n),
+        # prev_ty¹ = TaylorVector{2}(ComplexF64, n),
     )
 end
 
 function init!(predictor::Predictor)
     predictor.cond_H_ẋ = 1.0
-    predictor.winding_number = 1
+    # predictor.winding_number = 1
 
     predictor.t = predictor.prev_t = NaN
-    predictor.s = predictor.prev_s = NaN
-    predictor.trust_region = predictor.local_error = NaN
-    predictor.use_hermite = true
+    # predictor.s = predictor.prev_s = NaN
+    predictor.trust_region = NaN
+    predictor.local_error = NaN
+    # predictor.use_hermite = true
     predictor
 end
 
@@ -124,34 +120,51 @@ function update!(
     @unpack u, tx⁰, tx¹, tx², tx³, ty¹, xtemp, tx_norm = predictor
 
     x⁰, x¹, x², x³ = vectors(tx³)
-    y⁰, y¹ = vectors(ty¹)
 
-    m = predictor.winding_number
-    @inbounds for i = 1:length(xtemp)
-        predictor.prev_tx¹[i, 1] = predictor.tx¹[i, 1]
-        predictor.prev_tx¹[i, 2] = predictor.tx¹[i, 2]
-    end
-
-    predictor.prev_t, predictor.t = predictor.t, t
-
-    if m > 1
-        predictor.prev_s = predictor.s
-        predictor.s = t_to_s_plane(t, m)
-    end
-
-    # we use the accuracy of the previous prediction for the local error estimate
-    if isnothing(x̂)
-        predictor.local_error = NaN
-    else
-        Δs = fast_abs(t - predictor.prev_t)
-        predictor.local_error = norm(x̂, x) / Δs^predictor.order
-    end
 
     x⁰ .= x
     tx_norm[1] = norm(x)
-    if m > 1
-        y⁰ .= x
-    end
+
+    taylor!(u, Val(1), H, x, t)
+    u .= .-u
+    LA.ldiv!(xtemp, J, u)
+    δ = iterative_refinement!(
+        xtemp,
+        workspace(J),
+        u,
+        norm;
+        mixed_precision = false,
+        tol = eps(),
+        max_iters = 2,
+    )
+    predictor.cond_H_ẋ = cond_H_ẋ = δ / (2 * length(x) * eps())
+
+
+    # m = predictor.winding_number
+    # @inbounds for i = 1:length(xtemp)
+    #     predictor.prev_tx¹[i, 1] = predictor.tx¹[i, 1]
+    #     predictor.prev_tx¹[i, 2] = predictor.tx¹[i, 2]
+    # end
+
+    # predictor.prev_t, predictor.t = predictor.t, t
+
+    # if m > 1
+    #     predictor.prev_s = predictor.s
+    #     predictor.s = t_to_s_plane(t, m)
+    # end
+
+    # we use the accuracy of the previous prediction for the local error estimate
+    # if isnothing(x̂)
+    #     predictor.local_error = NaN
+    # else
+    #     Δs = fast_abs(t - predictor.prev_t)
+    #     predictor.local_error = norm(x̂, x) / Δs^predictor.order
+    # end
+
+
+    # if m > 1
+    #     y⁰ .= x
+    # end
 
     # Compute ẋ always using AD
     taylor!(u, Val(1), H, x, t)
