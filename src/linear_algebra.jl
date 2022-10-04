@@ -1,33 +1,43 @@
 """
-    MatrixWorkspace
+    MatrixWorkspace{T,S,M<:AbstractMatrix{T}} <: AbstractMatrix{T}
 
 This is a data structure for the efficient repeated solution of a square or
 overdetermined linear system `Ax=b`.
 """
-struct MatrixWorkspace{M<:AbstractMatrix{ComplexF64}} <: AbstractMatrix{ComplexF64}
+struct MatrixWorkspace{T<:Union{ComplexF64,ComplexDF64},M<:AbstractMatrix{T}} <:
+       AbstractMatrix{T}
     A::M # Matrix
     d::Vector{Float64} # Inverse of scaling factors
     factorized::Base.RefValue{Bool}
-    lu::LA.LU{ComplexF64,M} # LU Factorization of D * J
-    qr::LA.QR{ComplexF64,Matrix{ComplexF64}}
+    lu::LA.LU{T,M} # LU Factorization of D * J
+    qr::LA.QR{T,Matrix{T}}
     row_scaling::Vector{Float64}
     scaled::Base.RefValue{Bool}
     # mixed precision iterative refinement
     x̄::Vector{ComplexDF64}
-    r::Vector{ComplexF64}
+    r::Vector{T}
     r̄::Vector{ComplexDF64}
-    δx::Vector{ComplexF64}
-    inf_norm_est_work::Vector{ComplexF64}
+    δx::Vector{T}
+    inf_norm_est_work::Vector{T}
     inf_norm_est_rwork::Vector{Float64}
 end
 
 MatrixWorkspace(m::Integer, n::Integer; kwargs...) =
     MatrixWorkspace(zeros(ComplexF64, m, n); kwargs...)
-function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
+MatrixWorkspace{T}(
+    m::Integer,
+    n::Integer;
+    kwargs...,
+) where {T<:Union{ComplexF64,ComplexDF64}} = MatrixWorkspace(zeros(T, m, n); kwargs...)
+
+
+
+function MatrixWorkspace(Â::AbstractMatrix{T1}; optimize_data_structure = true) where {T1}
     m, n = size(Â)
     m ≥ n || throw(ArgumentError("Expected system with more rows than columns."))
 
-    A = Matrix{ComplexF64}(Â)
+    T = promote_type(ComplexF64, T1)
+    A = Matrix{T}(Â)
     d = ones(m)
     factorized = Ref(false)
     qr = LA.qrfactUnblocked!(copy(A))
@@ -40,11 +50,11 @@ function MatrixWorkspace(Â::AbstractMatrix; optimize_data_structure = true)
     scaled = Ref(false)
 
     lu = LinearAlgebra.LU{eltype(A),typeof(A)}(copy(A), zeros(Int, m), 0)
-    r = zeros(ComplexF64, m)
+    r = zeros(T, m)
     r̄ = zeros(ComplexDF64, m)
     x̄ = zeros(ComplexDF64, n)
-    δx = zeros(ComplexF64, n)
-    inf_norm_est_work = Vector{ComplexF64}(undef, n)
+    δx = zeros(T, n)
+    inf_norm_est_work = Vector{T}(undef, n)
     inf_norm_est_rwork = Vector{Float64}(undef, n)
 
     MatrixWorkspace(
@@ -403,6 +413,7 @@ function LA.ldiv!(x::AbstractVector, WS::MatrixWorkspace, b::AbstractVector)
         WS.r .= b
         qr_ldiv!(x, WS.qr, WS.r)
     end
+
     x
 end
 
@@ -794,7 +805,7 @@ end
 ## Jacobian ##
 #####################
 struct Jacobian{M}
-    workspace::MatrixWorkspace{M}
+    workspace::MatrixWorkspace{ComplexF64,M}
     # stats
     factorizations::Base.RefValue{Int}
     ldivs::Base.RefValue{Int}

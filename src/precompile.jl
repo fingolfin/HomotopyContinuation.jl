@@ -265,7 +265,7 @@ function _precompile_()
                 },
                 ExcessSolutionCheck{
                     RandomizedSystem{InterpretedSystem},
-                    MatrixWorkspace{Matrix{ComplexF64}},
+                    MatrixWorkspace{ComplexF64,Matrix{ComplexF64}},
                 },
             },
         },
@@ -498,7 +498,7 @@ function _precompile_()
                     },
                     ExcessSolutionCheck{
                         RandomizedSystem{InterpretedSystem},
-                        MatrixWorkspace{Matrix{ComplexF64}},
+                        MatrixWorkspace{ComplexF64,Matrix{ComplexF64}},
                     },
                 },
             },
@@ -570,7 +570,7 @@ function _precompile_()
         Tuple{
             Type{ExcessSolutionCheck},
             RandomizedSystem{InterpretedSystem},
-            NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}},
+            NewtonCache{MatrixWorkspace{ComplexF64,Matrix{ComplexF64}}},
         },
     )
     Base.precompile(
@@ -705,7 +705,7 @@ function _precompile_()
     Base.precompile(
         Tuple{
             Type{Jacobian},
-            MatrixWorkspace{Matrix{ComplexF64}},
+            MatrixWorkspace{ComplexF64,Matrix{ComplexF64}},
             Base.RefValue{Int64},
             Base.RefValue{Int64},
         },
@@ -747,7 +747,7 @@ function _precompile_()
             Vector{ComplexF64},
             Vector{ComplexF64},
             Vector{Complex{DoubleF64}},
-            MatrixWorkspace{Matrix{ComplexF64}},
+            MatrixWorkspace{ComplexF64,Matrix{ComplexF64}},
             Vector{ComplexF64},
         },
     )
@@ -761,7 +761,7 @@ function _precompile_()
             },
             ExcessSolutionCheck{
                 RandomizedSystem{InterpretedSystem},
-                MatrixWorkspace{Matrix{ComplexF64}},
+                MatrixWorkspace{ComplexF64,Matrix{ComplexF64}},
             },
         },
     )
@@ -1174,7 +1174,7 @@ function _precompile_()
             Vector{ComplexF64},
             Vector{ComplexF64},
             InfNorm,
-            NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}},
+            NewtonCache{MatrixWorkspace{ComplexF64,Matrix{ComplexF64}}},
         },
     )
     Base.precompile(
@@ -1288,7 +1288,7 @@ function _precompile_()
                                 },
                                 ExcessSolutionCheck{
                                     RandomizedSystem{InterpretedSystem},
-                                    MatrixWorkspace{Matrix{ComplexF64}},
+                                    MatrixWorkspace{ComplexF64,Matrix{ComplexF64}},
                                 },
                             },
                         },
@@ -1316,7 +1316,7 @@ function _precompile_()
                             },
                             ExcessSolutionCheck{
                                 RandomizedSystem{InterpretedSystem},
-                                MatrixWorkspace{Matrix{ComplexF64}},
+                                MatrixWorkspace{ComplexF64,Matrix{ComplexF64}},
                             },
                         },
                     },

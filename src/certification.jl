@@ -368,7 +368,7 @@ Base.@kwdef mutable struct CertificationCache
     jac_interpreter_F64::ModelKit.Interpreter{Vector{IComplexF64}}
     eval_interpreter_acb::ModelKit.Interpreter{AcbRefVector}
     jac_interpreter_acb::ModelKit.Interpreter{AcbRefVector}
-    newton_cache::NewtonCache{MatrixWorkspace{Matrix{ComplexF64}}}
+    newton_cache::NewtonCache{MatrixWorkspace{ComplexF64,Matrix{ComplexF64}}}
     # data for krawczyc_step
     C::Matrix{ComplexF64}
     r₀::Vector{IComplexF64}

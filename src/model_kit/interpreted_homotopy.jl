@@ -15,29 +15,37 @@ Construct an `InterpretedHomotopy` from the given [`Homotopy`](@ref) `H`.
 mutable struct InterpretedHomotopy <: AbstractHomotopy
     homotopy::Homotopy
     eval_ComplexF64::Interpreter{Vector{ComplexF64}}
+    jac_ComplexF64::Interpreter{Vector{ComplexF64}}
+    taylor_ComplexF64::TaylorInterpreters{ComplexF64}
+
     eval_ComplexDF64::Interpreter{Vector{ComplexDF64}}
+    jac_ComplexDF64::Interpreter{Vector{ComplexDF64}}
+    taylor_ComplexDF64::TaylorInterpreters{ComplexDF64}
+
     # Construct acb lazily since its often not needed
     eval_acb::Union{Nothing,Interpreter{AcbRefVector}}
-    taylor_ComplexF64::TaylorInterpreters{ComplexF64}
-    jac_ComplexF64::Interpreter{Vector{ComplexF64}}
     jac_acb::Union{Nothing,Interpreter{AcbRefVector}}
 end
 
 function InterpretedHomotopy(H::Homotopy)
     eval_ComplexF64 = interpreter(ComplexF64, H)
     eval_ComplexDF64 = interpreter(ComplexDF64, eval_ComplexF64)
-    eval_acb = nothing
     taylor_ComplexF64 = TaylorInterpreters{ComplexF64}()
     jac_ComplexF64 = jacobian_interpreter(ComplexF64, H)
+    jac_ComplexDF64 = interpreter(ComplexDF64, jac_ComplexF64)
+    taylor_ComplexDF64 = TaylorInterpreters{ComplexDF64}()
+    eval_acb = nothing
     jac_acb = nothing
 
     InterpretedHomotopy(
         H,
         eval_ComplexF64,
-        eval_ComplexDF64,
-        eval_acb,
-        taylor_ComplexF64,
         jac_ComplexF64,
+        taylor_ComplexF64,
+        eval_ComplexDF64,
+        jac_ComplexDF64,
+        taylor_ComplexDF64,
+        eval_acb,
         jac_acb,
     )
 end
@@ -74,6 +82,27 @@ function evaluate_and_jacobian!(u, U, H::InterpretedHomotopy, x, t, p = nothing)
 end
 function jacobian!(U, H::InterpretedHomotopy, x, t, p = nothing)
     execute!(nothing, U, H.jac_ComplexF64, x, t, p;)
+    U
+end
+function evaluate_and_jacobian!(
+    u,
+    U,
+    H::InterpretedHomotopy,
+    x::AbstractVector{ComplexDF64},
+    t,
+    p = nothing,
+)
+    execute!(u, U, H.jac_ComplexDF64, x, t, p)
+    nothing
+end
+function jacobian!(
+    U,
+    H::InterpretedHomotopy,
+    x::AbstractVector{ComplexDF64},
+    t,
+    p = nothing,
+)
+    execute!(nothing, U, H.jac_ComplexDF64, x, t, p;)
     U
 end
 
