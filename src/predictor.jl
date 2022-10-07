@@ -211,7 +211,6 @@ function update!(
 
     # The error of the fixed precision refinement is `2n * cond(J, ẋ) * eps()`
     cond_H_ẋ = δ / (2 * length(x) * eps())
-    @show cond_H_ẋ
     predictor.cond_H_ẋ = cond_H_ẋ
     refine(cond_H_ẋ > 1e5)
     tx_norm[3] = norm(xtemp)

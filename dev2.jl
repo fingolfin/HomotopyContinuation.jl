@@ -13,38 +13,48 @@ F = four_bar();
 q = read_parameters("four_bar_params_start.txt");
 p = read_parameters("four_bar_params_target.txt");
 xs = read_solutions("four_bar_sols.txt");
-# bad_paths = [
-#     135,
-#     779,
-#     845,
-#     861,
-#     1250,
-#     1450,
-#     1950,
-#     1979,
-#     2138,
-#     2365,
-#     2698,
-#     3050,
-#     3194,
-#     3566,
-#     3589,
-#     3709,
-#     3970,
-#     4643,
-#     4828,
-#     4997,
-#     5275,
-#     5567,
-#     5619,
-#     6139,
-#     6535,
-#     6910,
-#     7100,
-#     7480,
-#     7937,
-#     8196,
-# ];
+bad_paths = [
+    82,
+    285,
+    527,
+    702,
+    1695,
+    1837,
+    1845,
+    1850,
+    1935,
+    2008,
+    2132,
+    2491,
+    2501,
+    2798,
+    2799,
+    2808,
+    3156,
+    3221,
+    3992,
+    4054,
+    4266,
+    4318,
+    4541,
+    5052,
+    5213,
+    5816,
+    5846,
+    5888,
+    6062,
+    6528,
+    6672,
+    6842,
+    6946,
+    7132,
+    7351,
+    7681,
+    8221,
+    8256,
+    8455,
+    8478,
+]
 
 p = randn(ComplexF64, 16)
 
@@ -102,6 +112,7 @@ s_q = Complex{Float64}[
     1.675306384751507+1.859252783928112im,
 ]
 
+
 p = Complex{Float64}[
     7.297148065259444-3.7969299471707454im,
     0.06125202773860465+0.9251492821389162im,
@@ -139,17 +150,18 @@ q = Complex{Float64}[
     1.2021910424897007-1.1148794002014533im,
 ]
 
+
 H = ParameterHomotopy(F, q, p; compile = false);
 
-T = Tracker(H; options = (max_steps = 5,))
+T = Tracker(H)
 HomotopyContinuation.path_info(T, s_q)
 
 
 
 x₀ = xs[1];
-tracker = AdaptivePathTracker(H; predictor_order = 3);
-tracker3 = AdaptivePathTracker(H; predictor_order = 3);
-tracker4 = AdaptivePathTracker(H; predictor_order = 4);
+# tracker = AdaptivePathTracker(H; predictor_order = 3);
+# tracker3 = AdaptivePathTracker(H; predictor_order = 3);
+# tracker4 = AdaptivePathTracker(H; predictor_order = 4);
 @time S = adaptive_track(tracker, s_q);
 @time tracker_path_info(tracker, s_q)
 
@@ -163,8 +175,8 @@ R1_3 = map(s -> adaptive_track(tracker3, s), D);
 sum(r -> r.iter, R1_3) / N
 R2 = map(x -> track(T, x), xs[100:200]);
 sum(r -> steps(r), R2) / N
-count(s -> s.code === :success, R1_3)
 count(s -> is_success(s), R2)
+# count(s -> s.code === :success, R1_3)
 
 
 

@@ -541,7 +541,7 @@ function update_stepsize!(
     if is_converged(result)
         m = 2^N
         η = result.norm_Δx₀ / abs(Δs_prev)^p
-        δ1 = nthroot(ε, m) / ω^(7 / m)
+        δ1 = nthroot(ε, m) / ω^((m - 1) / m)
         δ2 = 1 / (m * ω)
         Δs₁ = nthroot(min(δ1, δ2) / η, p)
         Δs₂ = trust_region(predictor)
@@ -565,8 +565,8 @@ function check_terminated!(state::TrackerState, options::TrackerOptions)
         @unpack ω = state
         m = 2^N
 
-        μ_threshold = ((nthroot(ε, m) / ω^(7 / m))^2 * ω)^(1.5)
-        if state.μ > μ_threshold
+        μ_threshold = ((nthroot(ε, m) / ω^((m - 1) / m))^2 * ω)^(1)
+        if state.μ > μ_threshold && state.last_steps_failed > 3
             state.code = TrackerCode.terminated_accuracy_limit
             return
         end
@@ -741,9 +741,6 @@ function update_precision!(tracker::Tracker, μ_low)
 
     m = 2^N
     μ_threshold = ((nthroot(corrector.ε, m) / ω^(7 / m))^2 * ω)^(1.5)
-    println("\n======")
-    @show μ_threshold, μ, nthroot(corrector.ε, m) / ω^(7 / m)
-    println("======\n")
     if state.extended_prec && !state.keep_extended_prec && !isnan(μ_low) && μ_low > μ
         # check if we can go low again
         if μ_low < 0.125 * μ_threshold
@@ -823,7 +820,6 @@ function step!(tracker::Tracker)
     @unpack homotopy, corrector, predictor, state, options = tracker
     @unpack t, Δt, t′, x, x̂, x̄, jacobian, norm = state
 
-    @show t
     # Use the current approximation of x(t) to obtain estimate
     # x̂ ≈ x(t + Δt) using the predictor
     predict!(x̂, predictor, homotopy, x, t, Δt)
@@ -868,11 +864,8 @@ function step!(tracker::Tracker)
             state.refined_extended_prec = true
         end
 
-
-
         update_predictor!(tracker, x̂, state.Δs_prev, t)
         state.τ = trust_region(predictor)
-
 
         update!(state.norm, x)
     else
@@ -910,7 +903,6 @@ function track!(
     τ::Float64 = Inf,
     keep_steps::Bool = false,
     max_initial_step_size::Float64 = Inf,
-    debug::Bool = false,
 )
     init!(
         tracker,
@@ -926,7 +918,7 @@ function track!(
     )
 
     while is_tracking(tracker.state.code)
-        step!(tracker, debug)
+        step!(tracker)
     end
 
     tracker.state.code
@@ -938,23 +930,17 @@ function track!(tracker::Tracker, r::TrackerResult, t₁ = 1.0, t₀ = 0.0; debu
         solution(r),
         t₁,
         t₀;
-        debug = debug,
         ω = r.ω,
         μ = r.μ,
         τ = r.τ,
         extended_precision = r.extended_precision,
     )
 end
-function track!(
-    tracker::Tracker,
-    t₀;
-    debug::Bool = false,
-    max_initial_step_size::Float64 = Inf,
-)
+function track!(tracker::Tracker, t₀; max_initial_step_size::Float64 = Inf)
     init!(tracker, t₀; max_initial_step_size = max_initial_step_size)
 
     while is_tracking(tracker.state.code)
-        step!(tracker, debug)
+        step!(tracker)
     end
 
     tracker.state.code
